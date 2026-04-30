@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+    <style>
+        :root {
+            --primary: #7e4192; --primary-dark: #632e75;
+            --success: #059669; --danger: #e11d48; --warning: #d97706;
+            --bg: #f8fafc; --card-bg: #ffffff;
+            --border: #e2e8f0; --text: #0f172a; --text-muted: #646363;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: linear-gradient(135deg, #f0e6ff 0%, #e6f6fc 100%);
+            background-attachment: fixed;
+            color: var(--text); min-height: 100vh; padding: 2rem;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2.5rem; }
+        .title-area h1 { font-size: 1.8rem; font-weight: 700; }
+        .title-area p { color: var(--text-muted); font-size: 0.9rem; }
+        .upload-btn {
+            background: var(--primary); color: white; padding: 0.8rem 1.5rem; border-radius: 12px;
+            cursor: pointer; font-weight: 600; border: none; transition: 0.3s;
+        }
+        .upload-btn:hover { background: var(--primary-dark); transform: translateY(-2px); }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1.5rem; margin-bottom: 2rem; }
+        .kpi-card { background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid var(--border); padding: 1.5rem; border-radius: 24px; border-bottom: 4px solid var(--accent, var(--primary)); }
+        .kpi-label { color: var(--text-muted); font-size: 0.85rem; font-weight: 600; text-transform: uppercase; margin-bottom: 0.5rem; }
+        .kpi-value { font-size: 2.2rem; font-weight: 700; }
+        .charts-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.5rem; margin-bottom: 2rem; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); padding: 1.5rem; border-radius: 24px; margin-bottom: 1.5rem;}
+        .table-container { overflow-x: auto; margin-top: 1rem; max-height: 500px; overflow-y: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 1rem; color: var(--text-muted); border-bottom: 1px solid var(--border); position: sticky; top: 0; background: #f1f5f9; z-index: 10; }
+        td { padding: 1rem; border-bottom: 1px solid var(--border); }
+        .badge { padding: 0.3rem 0.8rem; border-radius: 8px; font-size: 0.75rem; font-weight: 700; }
+        .badge-success { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+        .badge-danger { background: rgba(244, 63, 94, 0.2); color: #f43f5e; }
+        #drop-zone { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(99, 102, 241, 0.9); z-index: 10000; display: none; align-items: center; justify-content: center; font-size: 2rem; font-weight: 800; color: white; }
+        #loading { display: none; color: var(--warning); font-weight: 600; margin-right: 1rem; }
+        .debug-info { font-family: monospace; font-size: 0.7rem; color: var(--text-muted); margin-top: 1rem; padding: 1rem; background: rgba(0,0,0,0.2); border-radius: 8px; }
+        .filter-input { background: #ffffff; border: 1px solid var(--border); color: var(--text); padding: 0.8rem; border-radius: 8px; outline: none; font-family: inherit; font-size: 0.9rem; width: 100%; transition: 0.3s; color-scheme: light; }
+        .filter-input:focus { border-color: var(--primary); }
+        /* Modal Styles */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(3px); z-index: 10000; display: none; align-items: center; justify-content: center; }
+        .modal { background: #fff; border-radius: 12px; width: 95%; max-width: 600px; max-height: 90vh; display: flex; flex-direction: column; color: #1e293b; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5); overflow: hidden; }
+        .modal-header { padding: 1.5rem; display: flex; justify-content: space-between; align-items: center; background: #fbfbfe; }
+        .modal-header h2 { font-size: 1.3rem; color: var(--primary); margin: 0; font-weight: 700; }
+        .close-btn { background: #f3f4f6; border: 1px solid #d1d5db; border-radius: 4px; cursor: pointer; padding: 0.2rem 0.5rem; font-weight: bold; color: #374151; font-size: 0.8rem; }
+        .modal-body { padding: 1.5rem; overflow-y: auto; flex: 1; background: #fff; }
+        .modal-desc { color: #6b7280; font-size: 0.85rem; margin-top: 0; margin-bottom: 1.5rem; line-height: 1.5; }
+        .rule-row { display: flex; gap: 1rem; margin-bottom: 0.8rem; align-items: center; }
+        .rule-input { flex: 1; padding: 0.6rem; border: 1px solid #e5e7eb; border-radius: 6px; font-family: inherit; font-size: 0.85rem; color: #111827; }
+        .rule-input:focus { outline: none; border-color: var(--primary); }
+        .btn-remove { background: #f9fafb; border: 1px solid #d1d5db; color: #374151; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 0.8rem; }
+        .btn-add { background: var(--text); color: var(--primary); width: 100%; padding: 0.9rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; margin-top: 1rem; transition: 0.2s; }
+        .btn-add:hover { background: #111827; }
+        .modal-footer { padding: 1.5rem; display: flex; justify-content: center; gap: 1rem; background: #fff; border-top: 1px solid #f3f4f6; }
+        .btn-secondary { background: var(--text); color: white; border: none; padding: 0.8rem 1.5rem; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .btn-primary-action { background: var(--primary); color: white; border: none; padding: 0.8rem 1.5rem; border-radius: 8px; cursor: pointer; font-weight: 600; transition: 0.2s; }
+        .btn-primary-action:hover { background: var(--primary-dark); }
+        
+        @media print {
+            @page { size: landscape; margin: 5mm; }
+            body { background: white !important; padding: 0 !important; font-size: 0.75rem; }
+            #header-actions, #drop-zone, .filter-bar, #pagination-controls, #debug { display: none !important; }
+            header { margin-bottom: 0.5rem !important; }
+            .title-area h1 { font-size: 1.2rem !important; }
+            .container { max-width: 100% !important; margin: 0 !important; padding: 0 !important; }
+            .card { box-shadow: none !important; border: 1px solid #e2e8f0 !important; margin-bottom: 0.5rem !important; padding: 0.5rem !important; break-inside: avoid; }
+            
+            /* Compactar KPIs */
+            .kpi-grid { gap: 0.5rem !important; margin-bottom: 0.5rem !important; }
+            .kpi-card { padding: 0.5rem !important; }
+            .kpi-value { font-size: 1.4rem !important; }
+            .card h3 { font-size: 0.9rem !important; margin-bottom: 0.2rem !important; }
+            
+            /* Gráficas extremadamente compactas para 1 sola página */
+            .charts-print-container {
+                display: grid !important;
+                grid-template-columns: 1fr 1fr !important;
+                gap: 0.5rem !important;
+            }
+            .charts-grid { display: contents !important; }
+            .charts-print-container .card { margin-bottom: 0 !important; width: 100% !important; }
+            
+            .card > div[style*="height"]:not(.table-container) { height: 160px !important; position: relative !important; overflow: hidden !important; display: flex; justify-content: center; align-items: center; }
+            
+            /* Tabla ultra-compacta para meter muchísimos más registros por hoja */
+            #table-card { break-inside: auto !important; margin-top: 0.5rem !important; }
+            .table-container { max-height: none !important; overflow: visible !important; }
+            th, td { padding: 0.2rem 0.3rem !important; font-size: 0.65rem !important; line-height: 1 !important; border-bottom: 1px solid #e2e8f0 !important; }
+            canvas { max-height: 160px !important; max-width: 100% !important; width: auto !important; height: auto !important; }
+        }
+    </style>
+</head>
+<body>
+<div id="settings-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Ajustes de Clientes</h2>
+            <button class="close-btn" onclick="closeModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <p class="modal-desc">Asocia números de teléfono o nombres al cliente correspondiente. Las llamadas que coincidan parcialmente se asignarán a ese cliente.</p>
+            <div id="rules-container"></div>
+            <button class="btn-add" onclick="addRule()">+ Agregar nueva regla</button>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeModal()">Cancelar</button>
+            <button class="btn-primary-action" onclick="saveRules()">Guardar y Recalcular</button>
+        </div>
+    </div>
+</div>
+<div id="drop-zone">SUELTA EL ARCHIVO AQUÍ</div>
+<div class="container">
+    <header>
+        <div style="display: flex; align-items: center; gap: 1rem;">
+            <img src="logo.png" alt="Logo REN" style="height: 55px; object-fit: contain;">
+            <div class="title-area">
+                <h1>Generador de Reportes REN</h1>
+            </div>
+        </div>
+        <div id="header-actions" style="display:flex; align-items:center; gap: 1rem;">
+            <button class="upload-btn" onclick="exportToPDF()" style="background: var(--success); display: none;" id="btn-export">Imprimir / PDF</button>
+            <span id="loading">Analizando datos...</span>
+            <button class="upload-btn" onclick="document.getElementById('file-input').click()">Seleccionar Archivo</button>
+        </div>
+        <input type="file" id="file-input" hidden accept=".csv,.xlsx,.xls">
+    </header>
+
+    <div class="filter-bar" style="display: flex; gap: 1.5rem; margin-bottom: 2rem; background: var(--card-bg); padding: 1.5rem; border-radius: 24px; border: 1px solid var(--border); flex-wrap: wrap;">
+        <div class="filter-group" style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1; min-width: 200px;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Cliente / Proyecto</label>
+                <button onclick="openModal()" style="background: none; border: none; color: var(--primary); font-size: 0.75rem; cursor: pointer; font-weight: 700; text-decoration: underline;">Ajustes</button>
+            </div>
+            <select id="project-filter" class="filter-input" onchange="applyFilter()" style="appearance: auto; cursor: pointer;">
+                <!-- Llenado dinámicamente -->
+            </select>
+        </div>
+        <div class="filter-group" style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1; min-width: 150px;">
+            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Estado Llamada</label>
+            <select id="status-filter" class="filter-input" onchange="applyFilter()" style="appearance: auto; cursor: pointer;">
+                <option value="all">Todos</option>
+                <option value="ANSWERED">Contestada</option>
+                <option value="NO ANSWER">No Contestada</option>
+                <option value="BUSY">Ocupado</option>
+                <option value="FAILED">Fallida</option>
+            </select>
+        </div>
+        <div class="filter-group" style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1; min-width: 150px;">
+            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Sentido</label>
+            <select id="direction-filter" class="filter-input" onchange="applyFilter()" style="appearance: auto; cursor: pointer;">
+                <option value="all">Todas</option>
+                <option value="inbound">Entrantes</option>
+                <option value="outbound">Salientes</option>
+                <option value="internal">Internas</option>
+            </select>
+        </div>
+        <div class="filter-group" style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1; min-width: 150px;">
+            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Desde</label>
+            <input type="date" id="date-from" class="filter-input" onchange="applyFilter()">
+        </div>
+        <div class="filter-group" style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1; min-width: 150px;">
+            <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Hasta</label>
+            <input type="date" id="date-to" class="filter-input" onchange="applyFilter()">
+        </div>
+    </div>
+    <div class="kpi-grid">
+        <div class="kpi-card" style="--accent: var(--primary)">
+            <div class="kpi-label">Llamadas Únicas</div>
+            <div class="kpi-value" id="val-unique">0</div>
+        </div>
+        <div class="kpi-card" style="--accent: var(--success)">
+            <div class="kpi-label">Contestadas Real</div>
+            <div class="kpi-value" id="val-answered">0</div>
+            <div id="val-ans-pct" style="font-size:0.8rem; font-weight:700">0% efectividad</div>
+        </div>
+        <div class="kpi-card" style="--accent: var(--danger)">
+            <div class="kpi-label">No Contestadas (Agente)</div>
+            <div class="kpi-value" id="val-unanswered" style="color: var(--danger)">0</div>
+        </div>
+        <div class="kpi-card" style="--accent: #f59e0b">
+            <div class="kpi-label">Abandonadas en IVR</div>
+            <div class="kpi-value" id="val-aband-ivr" style="color: #f59e0b">0</div>
+        </div>
+        <div class="kpi-card" style="--accent: #8b5cf6">
+            <div class="kpi-label">Promedio de Charla</div>
+            <div class="kpi-value" id="val-avg">00:00</div>
+        </div>
+    </div>
+    <div class="charts-print-container">
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <h3>Tendencia Diaria de Llamadas</h3>
+            <div style="height:250px"><canvas id="chart-timeline"></canvas></div>
+        </div>
+        <div class="charts-grid">
+            <div class="card"><h3>Volumen de Llamadas por Hora</h3><div style="height:300px"><canvas id="chart-hours"></canvas></div></div>
+            <div class="card"><h3>Estado de Llamadas</h3><div style="height:300px"><canvas id="chart-pie"></canvas></div></div>
+        </div>
+        <div class="card" style="margin-bottom: 1.5rem;">
+            <h3>Top 10 Extensiones (Mayor Cantidad de Llamadas Contestadas)</h3>
+            <div style="height:250px"><canvas id="chart-agents"></canvas></div>
+        </div>
+    </div>
+    <div class="card" id="table-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3>Registro Maestro de Llamadas</h3>
+            <span style="font-size: 0.8rem; color: var(--text-muted);">Clic en las columnas para ordenar</span>
+        </div>
+        <div class="table-container" style="max-height: 400px;">
+            <table id="table-calls">
+                <thead>
+                    <tr>
+                        <th onclick="sortTable('date')" style="cursor:pointer; user-select:none;">Fecha Inicio ↕</th>
+                        <th onclick="sortTable('src')" style="cursor:pointer; user-select:none;">Llamante ↕</th>
+                        <th onclick="sortTable('dst')" style="cursor:pointer; user-select:none;">Destino Final ↕</th>
+                        <th onclick="sortTable('status')" style="cursor:pointer; user-select:none;">Estado ↕</th>
+                        <th onclick="sortTable('totalTalk')" style="cursor:pointer; user-select:none;">Hablado (Máx) ↕</th>
+                        <th onclick="sortTable('events')" style="cursor:pointer; user-select:none;">Eventos ↕</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div id="pagination-controls" style="display:flex; justify-content:space-between; align-items:center; margin-top:1rem; padding: 0.5rem; background:var(--bg); border-radius:8px;">
+            <button onclick="prevPage()" class="btn-secondary" style="padding:0.5rem 1rem; font-size:0.8rem; background: var(--card-bg); color: var(--text); border: 1px solid var(--border);">Anterior</button>
+            <span id="page-info" style="font-size:0.85rem; font-weight:600; color:var(--text-muted);">Página 1 de 1</span>
+            <button onclick="nextPage()" class="btn-secondary" style="padding:0.5rem 1rem; font-size:0.8rem; background: var(--card-bg); color: var(--text); border: 1px solid var(--border);">Siguiente</button>
+        </div>
+    </div>
+    <div id="debug" class="debug-info">Esperando archivo...</div>
+</div>
+<script>
+    const fileInput = document.getElementById('file-input');
+    const loading = document.getElementById('loading');
+    const debug = document.getElementById('debug');
+    let charts = {};
+    let allCalls = []; // Variable global para guardar todas las llamadas
+    let currentFilteredCalls = [];
+    let currentPage = 1;
+    const rowsPerPage = 100;
+    let currentSort = { field: 'date', asc: false };
+
+    // --- Configuración Dinámica de Clientes ---
+    let defaultClients = [
+        { number: "7418031", name: "REN CONSULTORES" },
+        { number: "7418032", name: "REN IPS" },
+        { number: "7418033", name: "NUEVA EPS" },
+        { number: "7418034", name: "COMPENSAR" },
+        { number: "3878026", name: "MUTUAL SER" },
+        { number: "7418035", name: "ALIAN SALUD" },
+        { number: "2037013", name: "UDEA" },
+        { number: "7418037", name: "SINIESTROS" },
+        { number: "7418039", name: "SEGUROS" },
+        { number: "7418038", name: "MAPFRE" }
+    ];
+    let clientsConfig = JSON.parse(localStorage.getItem('clientsConfig')) || defaultClients;
+
+    function renderProjectFilter() {
+        const select = document.getElementById('project-filter');
+        select.innerHTML = '<option value="all">Todos los Proyectos</option>';
+        clientsConfig.forEach(client => {
+            if(client.number.trim() && client.name.trim()) {
+                const opt = document.createElement('option');
+                opt.value = client.number.trim();
+                opt.textContent = client.name.trim();
+                select.appendChild(opt);
+            }
+        });
+    }
+
+    renderProjectFilter(); // Llenar select al cargar
+
+    // --- Lógica del Modal ---
+    function openModal() {
+        const container = document.getElementById('rules-container');
+        container.innerHTML = '';
+        clientsConfig.forEach(client => {
+            container.appendChild(createRuleRow(client.number, client.name));
+        });
+        document.getElementById('settings-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('settings-modal').style.display = 'none';
+    }
+
+    function createRuleRow(number = '', name = '') {
+        const div = document.createElement('div');
+        div.className = 'rule-row';
+        div.innerHTML = `
+            <input type="text" class="rule-input rule-num" placeholder="Número (ej. 7418031)" value="${number}">
+            <input type="text" class="rule-input rule-name" placeholder="Cliente (ej. REN)" value="${name}">
+            <button class="btn-remove" onclick="this.parentElement.remove()">X</button>
+        `;
+        return div;
+    }
+
+    function addRule() {
+        document.getElementById('rules-container').appendChild(createRuleRow());
+    }
+
+    function saveRules() {
+        const rows = document.querySelectorAll('.rule-row');
+        const newConfig = [];
+        rows.forEach(row => {
+            const num = row.querySelector('.rule-num').value.trim();
+            const name = row.querySelector('.rule-name').value.trim();
+            if(num && name) {
+                newConfig.push({ number: num, name: name });
+            }
+        });
+        clientsConfig = newConfig;
+        localStorage.setItem('clientsConfig', JSON.stringify(clientsConfig));
+        renderProjectFilter();
+        closeModal();
+        applyFilter(); 
+    }
+    // ------------------------------------------
+
+    fileInput.onchange = e => handleFiles(e.target.files);
+    const dz = document.getElementById('drop-zone');
+    window.ondragover = e => { e.preventDefault(); dz.style.display = 'flex'; };
+    dz.ondragleave = () => dz.style.display = 'none';
+    dz.ondrop = e => { e.preventDefault(); dz.style.display = 'none'; handleFiles(e.dataTransfer.files); };
+    function log(msg) { debug.innerText = msg; console.log(msg); }
+    function handleFiles(files) {
+        if (!files.length) return;
+        const file = files[0];
+        const fileNameEl = document.getElementById('file-name');
+        if (fileNameEl) fileNameEl.textContent = `Archivo: ${file.name}`;
+        loading.style.display = 'inline';
+        log("Iniciando lectura...");
+        
+        const reader = new FileReader();
+        reader.onload = e => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const ws = workbook.Sheets[workbook.SheetNames[0]];
+                
+                // Leer como matriz cruda para encontrar cabeceras
+                const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "" });
+                if (rows.length === 0) throw new Error("El archivo está vacío.");
+                
+                log(`Leídas ${rows.length} filas. Buscando cabeceras...`);
+                processRawRows(rows);
+            } catch (err) {
+                alert("Error crítico: " + err.message);
+                loading.style.display = 'none';
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+    function normalizeKey(k) {
+        return String(k || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+    }
+    function processRawRows(rows) {
+        // 1. Encontrar la fila de cabecera
+        let headerIdx = -1;
+        for(let i=0; i<Math.min(rows.length, 20); i++) {
+            const rowStr = rows[i].join('|').toLowerCase();
+            if (rowStr.includes('cdr') || rowStr.includes('uniqueid') || rowStr.includes('id unico')) {
+                headerIdx = i;
+                break;
+            }
+        }
+        if (headerIdx === -1) headerIdx = 0; // Fallback
+        log(`Cabecera detectada en fila ${headerIdx + 1}`);
+        const headers = rows[headerIdx];
+        const dataRows = rows.slice(headerIdx + 1);
+        // 2. Mapear columnas por nombre o por índice conocido
+        const col = { uid: -1, date: -1, src: -1, dst: -1, did: -1, talk: -1, status: -1, agent: -1, direction: -1, dstExt: -1 };
+        
+        headers.forEach((h, idx) => {
+            const n = normalizeKey(h);
+            if (n.includes('idunico') || n.includes('uniqueid')) col.uid = idx;
+            if (n.includes('inicio') || n.includes('calldate')) col.date = idx;
+            if (n.includes('llamante') || n.includes('src')) col.src = idx;
+            if (n.includes('destinatario') || n.includes('dst')) col.dst = idx;
+            if (n.includes('did')) col.did = idx;
+            if (n.includes('conversacion') || n.includes('billsec')) col.talk = idx;
+            if (n.includes('estado') || n.includes('disposition')) col.status = idx;
+            if (n.includes('respondida')) col.agent = idx;
+            if (n.includes('tipo') && n.includes('llamada')) col.direction = idx;
+            if (n.includes('extensi') && n.includes('destino')) col.dstExt = idx;
+        });
+        // Fallbacks por índice si los nombres fallan (basado en archivo de Sandra)
+        if (col.uid === -1) col.uid = 20;
+        if (col.date === -1) col.date = 13;
+        if (col.src === -1) col.src = 2;
+        if (col.dst === -1) col.dst = 5;
+        if (col.talk === -1) col.talk = 17;
+        if (col.status === -1) col.status = 18;
+        if (col.agent === -1) col.agent = 24;
+        if (col.direction === -1) col.direction = 21;
+        if (col.dstExt === -1) col.dstExt = 22;
+        log(`Mapeo: ID=${col.uid}, Fecha=${col.date}, Agente=${col.agent}, Sentido=${col.direction}`);
+        const callsMap = {};
+        let validCount = 0;
+        dataRows.forEach((row, i) => {
+            if (!row[col.uid]) return;
+            const id = String(row[col.uid]);
+            validCount++;
+            if (!callsMap[id]) {
+                callsMap[id] = {
+                    date: row[col.date],
+                    src: row[col.src],
+                    dst: row[col.dst],
+                    did: col.did !== -1 ? row[col.did] : '',
+                    agent: '',
+                    direction: col.direction !== -1 ? row[col.direction] : '',
+                    totalTalk: 0,
+                    status: 'NO ANSWER',
+                    events: 0,
+                    reachedExt: false
+                };
+            }
+            const talk = parseInt(row[col.talk]) || 0;
+            const status = String(row[col.status] || "").toUpperCase();
+            
+            callsMap[id].events++;
+            callsMap[id].totalTalk = Math.max(callsMap[id].totalTalk, talk);
+            
+            if (col.agent !== -1 && row[col.agent] && row[col.agent] !== 'error') {
+                callsMap[id].agent = row[col.agent];
+            }
+            
+            if (!callsMap[id].reachedExt) {
+                const d1 = String(row[col.dst] || "");
+                const d2 = col.dstExt !== -1 ? String(row[col.dstExt] || "") : "";
+                if (/^\d{4}$/.test(d1) || /^\d{4}$/.test(d2)) {
+                    callsMap[id].reachedExt = true;
+                }
+            }
+            
+            if (status.includes('ANSWERED') && talk > 0) callsMap[id].status = 'ANSWERED';
+            else if (status.includes('BUSY') && callsMap[id].status !== 'ANSWERED') callsMap[id].status = 'BUSY';
+            else if (status.includes('FAILED') && callsMap[id].status === 'NO ANSWER') callsMap[id].status = 'FAILED';
+        });
+        let aggregated = Object.values(callsMap);
+        
+        // Post-procesamiento: separar "No Contestadas" de "Abandonadas en IVR"
+        aggregated = aggregated.map(c => {
+            const dir = String(c.direction || "").toUpperCase();
+            if (c.status !== 'ANSWERED' && dir.includes('INBOUND') && !c.reachedExt) {
+                c.status = 'ABANDONED_IVR';
+            }
+            return c;
+        });
+
+        log(`Procesadas ${validCount} filas en ${aggregated.length} llamadas únicas.`);
+        
+        allCalls = aggregated;
+        document.getElementById('btn-export').style.display = 'inline-block';
+        applyFilter();
+        loading.style.display = 'none';
+    }
+
+    function parseDate(val) {
+        if (!val) return null;
+        if (typeof val === 'number') {
+            const d = new Date(Math.round((val - 25569)*86400*1000));
+            d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
+            return d;
+        }
+        let d = new Date(val);
+        if (!isNaN(d.getTime())) return d;
+        const s = String(val);
+        const parts = s.match(/(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+        if (parts) return new Date(parts[3], parts[2]-1, parts[1], parts[4]||0, parts[5]||0, parts[6]||0);
+        return null;
+    }
+
+    function formatDate(val) {
+        const d = parseDate(val);
+        if (!d || isNaN(d.getTime())) return val;
+        const pad = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    function applyFilter() {
+        const projectVal = document.getElementById('project-filter').value;
+        const statusVal = document.getElementById('status-filter').value;
+        const directionVal = document.getElementById('direction-filter').value;
+        const dateFrom = document.getElementById('date-from').value;
+        const dateTo = document.getElementById('date-to').value;
+        
+        let filtered = allCalls.filter(c => {
+            if (projectVal !== 'all') {
+                const did = String(c.did || '');
+                const dst = String(c.dst || '');
+                if (!did.includes(projectVal) && !dst.includes(projectVal)) return false;
+            }
+            if (statusVal !== 'all') {
+                if (c.status !== statusVal) return false;
+            }
+            if (directionVal !== 'all') {
+                const dir = String(c.direction || '').toLowerCase();
+                if (!dir.includes(directionVal)) return false;
+            }
+            if (dateFrom || dateTo) {
+                const d = parseDate(c.date);
+                if (d && !isNaN(d.getTime())) {
+                    const year = d.getFullYear();
+                    const month = String(d.getMonth() + 1).padStart(2, '0');
+                    const day = String(d.getDate()).padStart(2, '0');
+                    const cDateStr = `${year}-${month}-${day}`;
+                    
+                    if (dateFrom && cDateStr < dateFrom) return false;
+                    if (dateTo && cDateStr > dateTo) return false;
+                }
+            }
+            return true;
+        });
+        updateUI(filtered);
+    }
+
+    function updateUI(calls) {
+        currentFilteredCalls = calls;
+        
+        currentFilteredCalls.sort((a,b) => {
+            let valA = a[currentSort.field];
+            let valB = b[currentSort.field];
+            if(currentSort.field === 'date') {
+                valA = parseDate(a.date) ? parseDate(a.date).getTime() : 0;
+                valB = parseDate(b.date) ? parseDate(b.date).getTime() : 0;
+            } else if(currentSort.field === 'dst') {
+                valA = a.did ? String(a.did) : String(a.dst);
+                valB = b.did ? String(b.did) : String(b.dst);
+            }
+            if (valA < valB) return currentSort.asc ? -1 : 1;
+            if (valA > valB) return currentSort.asc ? 1 : -1;
+            return 0;
+        });
+
+        const ans = calls.filter(c => c.status === 'ANSWERED');
+        // Para el KPI de "No Contestadas", ignoramos las que se abandonaron en el IVR
+        const unans = calls.filter(c => c.status !== 'ANSWERED' && c.status !== 'ABANDONED_IVR');
+        const abandIvr = calls.filter(c => c.status === 'ABANDONED_IVR');
+        
+        document.getElementById('val-unique').textContent = calls.length.toLocaleString();
+        document.getElementById('val-answered').textContent = ans.length.toLocaleString();
+        document.getElementById('val-unanswered').textContent = unans.length.toLocaleString();
+        document.getElementById('val-aband-ivr').textContent = abandIvr.length.toLocaleString();
+        
+        const pct = calls.length ? ((ans.length / calls.length) * 100).toFixed(1) : 0;
+        document.getElementById('val-ans-pct').textContent = `${pct}% de eficiencia real`;
+        const avg = ans.length ? Math.round(ans.reduce((a,b) => a + b.totalTalk, 0) / ans.length) : 0;
+        document.getElementById('val-avg').textContent = fmtTime(avg);
+        renderCharts(calls, ans.length, unans.length);
+        
+        currentPage = 1;
+        renderTable();
+    }
+
+    function sortTable(field) {
+        if (currentSort.field === field) currentSort.asc = !currentSort.asc;
+        else { currentSort.field = field; currentSort.asc = true; }
+        updateUI(currentFilteredCalls);
+    }
+
+    function prevPage() { if (currentPage > 1) { currentPage--; renderTable(); } }
+    function nextPage() { if (currentPage < Math.ceil(currentFilteredCalls.length / rowsPerPage)) { currentPage++; renderTable(); } }
+
+    function renderTable() {
+        const tbody = document.querySelector('#table-calls tbody');
+        const start = (currentPage - 1) * rowsPerPage;
+        const pageCalls = currentFilteredCalls.slice(start, start + rowsPerPage);
+        
+        tbody.innerHTML = pageCalls.map(c => `
+            <tr>
+                <td style="font-size:0.75rem">${formatDate(c.date)}</td>
+                <td style="font-weight:700">${c.src}</td>
+                <td>${c.did ? c.did : c.dst}</td>
+                <td><span class="badge ${c.status === 'ANSWERED' ? 'badge-success' : 'badge-danger'}">${c.status}</span></td>
+                <td>${fmtTime(c.totalTalk)}</td>
+                <td style="color:var(--text-muted)">${c.events} CDRs</td>
+            </tr>
+        `).join('');
+        
+        const maxPage = Math.ceil(currentFilteredCalls.length / rowsPerPage) || 1;
+        document.getElementById('page-info').textContent = `Página ${currentPage} de ${maxPage} (${currentFilteredCalls.length} registros)`;
+    }
+    function fmtTime(s) {
+        const h = Math.floor(s / 3600);
+        const m = Math.floor((s % 3600) / 60);
+        const rs = s % 60;
+        if (h > 0) return `${h}:${m.toString().padStart(2,'0')}:${rs.toString().padStart(2,'0')}`;
+        return `${m}:${rs.toString().padStart(2,'0')}`;
+    }
+    function renderCharts(all, aCount, uCount) {
+        if (charts.pie) charts.pie.destroy();
+        if (charts.hours) charts.hours.destroy();
+        if (charts.timeline) charts.timeline.destroy();
+        if (charts.agents) charts.agents.destroy();
+
+        charts.pie = new Chart(document.getElementById('chart-pie'), {
+            type: 'doughnut',
+            data: {
+                labels: ['Contestadas', 'No Contestadas'],
+                datasets: [{ data: [aCount, uCount], backgroundColor: ['#059669', '#e11d48'], borderWidth: 0 }]
+            },
+            options: { maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#64748b' } } } }
+        });
+
+        const hourMap = Array(24).fill(0);
+        const dayMap = {};
+
+        all.forEach(c => {
+            const d = parseDate(c.date);
+            if(d && !isNaN(d.getTime())) {
+                hourMap[d.getHours()]++;
+                const dayStr = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+                dayMap[dayStr] = (dayMap[dayStr] || 0) + 1;
+            }
+        });
+
+        charts.hours = new Chart(document.getElementById('chart-hours'), {
+            type: 'bar',
+            data: {
+                labels: Array.from({length: 24}, (_, i) => `${i}h`),
+                datasets: [{ label: 'Llamadas Reales', data: hourMap, backgroundColor: '#08ace5', borderRadius: 8 }]
+            },
+            options: { maintainAspectRatio: false, scales: { 
+                y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#64748b' } },
+                x: { grid: { display: false }, ticks: { color: '#64748b' } }
+            }}
+        });
+
+        const sortedDays = Object.keys(dayMap).sort();
+        charts.timeline = new Chart(document.getElementById('chart-timeline'), {
+            type: 'line',
+            data: {
+                labels: sortedDays,
+                datasets: [{ 
+                    label: 'Volumen Diario', 
+                    data: sortedDays.map(d => dayMap[d]), 
+                    borderColor: '#7e4192', 
+                    backgroundColor: 'rgba(126, 65, 146, 0.1)', 
+                    fill: true, 
+                    tension: 0.3 
+                }]
+            },
+            options: { maintainAspectRatio: false, scales: { 
+                y: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#64748b' }, beginAtZero: true },
+                x: { grid: { display: false }, ticks: { color: '#64748b', maxRotation: 45, minRotation: 45 } }
+            }}
+        });
+
+        const agentMap = {};
+        all.forEach(c => {
+            if(c.status === 'ANSWERED') {
+                let ext = c.agent ? String(c.agent).trim() : '';
+                if (!ext && String(c.dst).length <= 5) ext = String(c.dst).trim();
+                if (!ext && String(c.src).length <= 5) ext = String(c.src).trim();
+                
+                // Filtrar solo extensiones de PBX (normalmente de 3 a 5 dígitos numéricos)
+                if (ext && ext.length <= 5 && !isNaN(ext)) {
+                    agentMap[ext] = (agentMap[ext] || 0) + 1;
+                }
+            }
+        });
+        const sortedAgents = Object.keys(agentMap).sort((a,b) => agentMap[b] - agentMap[a]).slice(0, 10);
+        const agentData = sortedAgents.map(a => agentMap[a]);
+
+        charts.agents = new Chart(document.getElementById('chart-agents'), {
+            type: 'bar',
+            data: {
+                labels: sortedAgents,
+                datasets: [{ 
+                    label: 'Llamadas Contestadas', 
+                    data: agentData, 
+                    backgroundColor: '#08ace5', 
+                    borderRadius: 4 
+                }]
+            },
+            options: { 
+                indexAxis: 'y',
+                maintainAspectRatio: false, 
+                plugins: { legend: { display: false } },
+                scales: { 
+                    x: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { color: '#64748b' } },
+                    y: { grid: { display: false }, ticks: { color: '#64748b', font: { weight: 'bold' } } }
+                }
+            }
+        });
+    }
+
+    function exportToPDF() {
+        const tableContainer = document.querySelector('.table-container');
+        const oldMaxHeight = tableContainer.style.maxHeight;
+        tableContainer.style.maxHeight = 'none'; // Expandir tabla para la impresión
+        
+        // Esperar un milisegundo para que el DOM se actualice antes de abrir el diálogo
+        setTimeout(() => {
+            window.print();
+            tableContainer.style.maxHeight = oldMaxHeight || '400px';
+        }, 100);
+    }
+</script>
+</body>
+</html>
