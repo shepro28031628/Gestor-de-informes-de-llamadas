@@ -119,6 +119,26 @@
         </div>
     </div>
 </div>
+<div id="api-modal" class="modal-overlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>Conexión con la Planta (API)</h2>
+            <button class="close-btn" onclick="closeApiModal()">×</button>
+        </div>
+        <div class="modal-body">
+            <p class="modal-desc">Datos de la API de reportes de llamadas. Se guardan solo en este navegador.</p>
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted);">URL de la API</label>
+            <input type="text" id="api-url" class="rule-input" style="width:100%; margin:0.4rem 0 1rem;" placeholder="http://181.49.161.210:3091">
+            <label style="font-size:0.75rem; font-weight:700; color:var(--text-muted);">API Key</label>
+            <input type="password" id="api-key" class="rule-input" style="width:100%; margin-top:0.4rem;" placeholder="Clave X-API-Key">
+            <div id="api-test-result" style="font-size:0.8rem; margin-top:0.8rem;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="testApi()">Probar conexión</button>
+            <button class="btn-primary-action" onclick="saveApiConfig()">Guardar y Sincronizar</button>
+        </div>
+    </div>
+</div>
 <div id="drop-zone">SUELTA EL ARCHIVO AQUÍ</div>
 <div class="container">
     <header>
@@ -131,6 +151,8 @@
         <div id="header-actions" style="display:flex; align-items:center; gap: 1rem;">
             <button class="upload-btn" onclick="exportToPDF()" style="background: var(--success); display: none;" id="btn-export">Imprimir / PDF</button>
             <span id="loading">Analizando datos...</span>
+            <button class="upload-btn" onclick="syncFromAPI()" style="background: #f97316;" title="Trae las llamadas del rango Desde/Hasta directamente de la planta">Sincronizar Planta</button>
+            <button onclick="openApiModal()" style="background:none; border:none; color:var(--primary); font-size:0.75rem; cursor:pointer; font-weight:700; text-decoration:underline;">Conexión API</button>
             <button class="upload-btn" onclick="document.getElementById('file-input').click()">Seleccionar Archivo</button>
         </div>
         <input type="file" id="file-input" hidden accept=".csv,.xlsx,.xls">
@@ -154,6 +176,7 @@
                 <option value="NO ANSWER">No Contestada</option>
                 <option value="BUSY">Ocupado</option>
                 <option value="FAILED">Fallida</option>
+                <option value="ABANDONED_IVR">Abandonada en IVR</option>
             </select>
         </div>
         <div class="filter-group" style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1; min-width: 150px;">
@@ -167,11 +190,11 @@
         </div>
         <div class="filter-group" style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1; min-width: 150px;">
             <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Desde</label>
-            <input type="date" id="date-from" class="filter-input" onchange="applyFilter()">
+            <input type="date" id="date-from" class="filter-input" onchange="onDateChange()">
         </div>
         <div class="filter-group" style="display: flex; flex-direction: column; gap: 0.5rem; flex: 1; min-width: 150px;">
             <label style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Hasta</label>
-            <input type="date" id="date-to" class="filter-input" onchange="applyFilter()">
+            <input type="date" id="date-to" class="filter-input" onchange="onDateChange()">
         </div>
     </div>
     <div class="kpi-grid">
@@ -209,6 +232,24 @@
         <div class="card" style="margin-bottom: 1.5rem;">
             <h3>Top 10 Extensiones (Mayor Cantidad de Llamadas Contestadas)</h3>
             <div style="height:250px"><canvas id="chart-agents"></canvas></div>
+        </div>
+    </div>
+    <div class="card" id="survey-card" style="margin-bottom: 1.5rem; display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h3>Encuestas de Satisfacción</h3>
+            <span id="survey-subtitle" style="font-size: 0.8rem; color: var(--text-muted);"></span>
+        </div>
+        <div class="kpi-grid" style="margin-bottom: 1rem;">
+            <div class="kpi-card" style="--accent: #ec4899"><div class="kpi-label">Encuestas Completas (P3)</div><div class="kpi-value" id="sv-complete" style="color:#ec4899">0</div><div id="sv-started" style="font-size:0.8rem; font-weight:700"></div></div>
+            <div class="kpi-card" style="--accent: var(--success)"><div class="kpi-label">Pregunta 1 · Satisfacción</div><div class="kpi-value" id="sv-p1">-</div><div id="sv-p1d" style="font-size:0.8rem; font-weight:700"></div></div>
+            <div class="kpi-card" style="--accent: var(--success)"><div class="kpi-label">Pregunta 2 · Satisfacción</div><div class="kpi-value" id="sv-p2">-</div><div id="sv-p2d" style="font-size:0.8rem; font-weight:700"></div></div>
+            <div class="kpi-card" style="--accent: var(--success)"><div class="kpi-label">Pregunta 3 · Satisfacción</div><div class="kpi-value" id="sv-p3">-</div><div id="sv-p3d" style="font-size:0.8rem; font-weight:700"></div></div>
+        </div>
+        <div class="table-container" style="max-height: 300px;">
+            <table id="table-surveys">
+                <thead><tr><th>Proyecto</th><th>Encuestas</th><th>Completas</th><th>P1 Sí / No</th><th>P2 Sí / No</th><th>P3 Sí / No</th></tr></thead>
+                <tbody></tbody>
+            </table>
         </div>
     </div>
     <div class="card" id="table-card">
@@ -268,8 +309,10 @@
     function renderProjectFilter() {
         const select = document.getElementById('project-filter');
         select.innerHTML = '<option value="all">Todos los Proyectos</option>';
+        const added = new Set(); // un proyecto con varios números aparece una sola vez
         clientsConfig.forEach(client => {
-            if(client.number.trim() && client.name.trim()) {
+            if(client.number.trim() && client.name.trim() && !added.has(client.name.trim())) {
+                added.add(client.name.trim());
                 const opt = document.createElement('option');
                 opt.value = client.number.trim();
                 opt.textContent = client.name.trim();
@@ -323,7 +366,12 @@
         localStorage.setItem('clientsConfig', JSON.stringify(clientsConfig));
         renderProjectFilter();
         closeModal();
-        applyFilter(); 
+        if (apiMode) {
+            // con la API, los proyectos se guardan en el servidor y se recalcula desde la planta
+            saveRulesToAPI().then(syncFromAPI).catch(e => { alert(e.message); applyFilter(); });
+        } else {
+            applyFilter();
+        }
     }
     // ------------------------------------------
 
@@ -335,6 +383,8 @@
     function log(msg) { debug.innerText = msg; console.log(msg); }
     function handleFiles(files) {
         if (!files.length) return;
+        apiMode = false; // al cargar un archivo se trabaja con el archivo, no con la API
+        document.getElementById('survey-card').style.display = 'none';
         const file = files[0];
         const fileNameEl = document.getElementById('file-name');
         if (fileNameEl) fileNameEl.textContent = `Archivo: ${file.name}`;
@@ -495,11 +545,19 @@
         const dateFrom = document.getElementById('date-from').value;
         const dateTo = document.getElementById('date-to').value;
         
+        // un proyecto puede tener varios números: se aceptan todos los del mismo nombre
+        const projectSel = document.getElementById('project-filter');
+        const projectName = projectVal !== 'all' ? projectSel.options[projectSel.selectedIndex].textContent : '';
+        const projectNums = projectVal !== 'all'
+            ? clientsConfig.filter(cl => cl.name.trim() === projectName).map(cl => cl.number.trim())
+            : [];
+        if (projectVal !== 'all' && !projectNums.length) projectNums.push(projectVal);
+
         let filtered = allCalls.filter(c => {
             if (projectVal !== 'all') {
                 const did = String(c.did || '');
                 const dst = String(c.dst || '');
-                if (!did.includes(projectVal) && !dst.includes(projectVal)) return false;
+                if (!projectNums.some(n => did.includes(n) || dst.includes(n))) return false;
             }
             if (statusVal !== 'all') {
                 if (c.status !== statusVal) return false;
@@ -523,6 +581,7 @@
             return true;
         });
         updateUI(filtered);
+        refreshSurveys();
     }
 
     function updateUI(calls) {
@@ -694,6 +753,182 @@
                 }
             }
         });
+    }
+
+    // =====================================================================
+    // --- Conexión con la API de la planta (Sincronizar Planta) ---
+    // =====================================================================
+    let apiMode = false; // true cuando los datos vienen de la API y no de un archivo
+    const DIR_MAP = { entrante: 'Inbound', saliente: 'Outbound', interna: 'Internal', externa: 'External' };
+
+    function getApiConfig() {
+        try { return JSON.parse(localStorage.getItem('apiConfig')) || {}; } catch (e) { return {}; }
+    }
+    function openApiModal() {
+        const cfg = getApiConfig();
+        document.getElementById('api-url').value = cfg.url || 'http://181.49.161.210:3091';
+        document.getElementById('api-key').value = cfg.key || '';
+        document.getElementById('api-test-result').textContent = '';
+        document.getElementById('api-modal').style.display = 'flex';
+    }
+    function closeApiModal() { document.getElementById('api-modal').style.display = 'none'; }
+    function readApiForm() {
+        return { url: document.getElementById('api-url').value.trim().replace(/\/+$/, ''),
+                 key: document.getElementById('api-key').value.trim() };
+    }
+    async function apiGet(path, cfg = getApiConfig()) {
+        if (!cfg.url || !cfg.key) throw new Error('Configura la URL y la API Key en "Conexión API".');
+        let res;
+        try {
+            res = await fetch(cfg.url + path, { headers: { 'X-API-Key': cfg.key } });
+        } catch (e) {
+            throw new Error('No se pudo conectar con la API (' + cfg.url + '). Revisa la URL o tu conexión.');
+        }
+        if (res.status === 401) throw new Error('API Key inválida.');
+        if (!res.ok) {
+            let detail = '';
+            try { detail = (await res.json()).detail || ''; } catch (e) {}
+            throw new Error(`Error ${res.status} de la API. ${detail}`);
+        }
+        return res.json();
+    }
+    async function testApi() {
+        const out = document.getElementById('api-test-result');
+        out.style.color = 'var(--text-muted)'; out.textContent = 'Probando...';
+        try {
+            const st = await apiGet('/api/estado', readApiForm());
+            out.style.color = 'var(--success)';
+            out.textContent = `Conexión correcta. Datos guardados desde ${st.desde || '-'} hasta ${st.hasta || '-'} · última sincronización ${st.ultima_sincronizacion || '-'}`;
+        } catch (e) {
+            out.style.color = 'var(--danger)'; out.textContent = e.message;
+        }
+    }
+    function saveApiConfig() {
+        localStorage.setItem('apiConfig', JSON.stringify(readApiForm()));
+        closeApiModal();
+        syncFromAPI();
+    }
+
+    function isoDate(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
+
+    async function loadProjectsFromAPI() {
+        const projects = await apiGet('/api/proyectos');
+        const flat = [];
+        projects.forEach(p => (p.numeros || []).forEach(n => flat.push({ number: n, name: p.nombre })));
+        if (flat.length) {
+            clientsConfig = flat;
+            localStorage.setItem('clientsConfig', JSON.stringify(clientsConfig));
+            const select = document.getElementById('project-filter');
+            const prevName = select.value === 'all' ? null : select.options[select.selectedIndex].textContent;
+            renderProjectFilter();
+            const match = [...select.options].find(o => o.textContent === prevName);
+            if (match) select.value = match.value;
+        }
+    }
+
+    async function syncFromAPI() {
+        const from = document.getElementById('date-from');
+        const to = document.getElementById('date-to');
+        if (!from.value && !to.value) {
+            const now = new Date();
+            from.value = isoDate(new Date(now.getFullYear(), now.getMonth(), 1));
+            to.value = isoDate(now);
+        }
+        const desde = from.value || to.value;
+        const hasta = to.value || from.value;
+        loading.style.display = 'inline';
+        log(`Consultando la planta del ${desde} al ${hasta}...`);
+        try {
+            await loadProjectsFromAPI();
+            let pagina = 1, paginas = 1, rows = [];
+            do {
+                const data = await apiGet(`/api/llamadas?desde=${desde}&hasta=${hasta}&por_pagina=5000&pagina=${pagina}&orden=fecha`);
+                rows = rows.concat(data.llamadas);
+                paginas = data.paginas;
+                pagina++;
+            } while (pagina <= paginas);
+            allCalls = rows.map(c => ({
+                date: c.fecha,
+                src: c.llamante,
+                dst: c.destino,
+                did: c.numero_proyecto || '',
+                agent: c.extension || '',
+                direction: DIR_MAP[c.sentido] || c.sentido,
+                totalTalk: c.hablado_seg,
+                status: c.estado,
+                events: c.eventos,
+                project: c.proyecto
+            }));
+            apiMode = true;
+            document.getElementById('btn-export').style.display = 'inline-block';
+            log(`Planta sincronizada: ${allCalls.length} llamadas únicas del ${desde} al ${hasta}.`);
+            applyFilter();
+        } catch (e) {
+            log('Error: ' + e.message);
+            alert(e.message);
+            if (/Configura|inválida/.test(e.message)) openApiModal();
+        } finally {
+            loading.style.display = 'none';
+        }
+    }
+
+    let dateTimer = null;
+    function onDateChange() {
+        // con datos de la API, un rango nuevo se trae de la planta; con archivo, se filtra localmente
+        if (!apiMode) return applyFilter();
+        const f = document.getElementById('date-from').value;
+        const t = document.getElementById('date-to').value;
+        if (f && t && f > t) { log('Ajusta "Hasta" para que no sea anterior a "Desde".'); return; }
+        clearTimeout(dateTimer);
+        dateTimer = setTimeout(syncFromAPI, 400); // espera a que termine de elegir la fecha
+    }
+
+    let surveyTimer = null;
+    function refreshSurveys() {
+        if (!apiMode) return;
+        clearTimeout(surveyTimer);
+        surveyTimer = setTimeout(loadSurveys, 150);
+    }
+    async function loadSurveys() {
+        const desde = document.getElementById('date-from').value;
+        const hasta = document.getElementById('date-to').value || desde;
+        const sel = document.getElementById('project-filter');
+        const proyecto = sel.value === 'all' ? '' : `&proyecto=${encodeURIComponent(sel.options[sel.selectedIndex].textContent)}`;
+        try {
+            const d = await apiGet(`/api/encuestas?desde=${desde}&hasta=${hasta}${proyecto}`);
+            document.getElementById('survey-card').style.display = 'block';
+            document.getElementById('survey-subtitle').textContent = `Tecla 1 = Sí · Tecla 2 = No · ${desde} a ${hasta}`;
+            document.getElementById('sv-complete').textContent = d.encuestas_completas.toLocaleString();
+            document.getElementById('sv-started').textContent = `${d.encuestas_iniciadas} iniciadas`;
+            ['p1', 'p2', 'p3'].forEach(q => {
+                const p = d.preguntas[q];
+                document.getElementById(`sv-${q}`).textContent = p.satisfaccion_pct === null ? '-' : `${p.satisfaccion_pct}%`;
+                document.getElementById(`sv-${q}d`).textContent = `Sí: ${p.si} | No: ${p.no}`;
+            });
+            document.querySelector('#table-surveys tbody').innerHTML = d.por_proyecto.map(p => `
+                <tr>
+                    <td style="font-weight:700">${p.proyecto}</td>
+                    <td>${p.encuestas}</td>
+                    <td>${p.completas}</td>
+                    <td>${p.preguntas.p1.si} / ${p.preguntas.p1.no}</td>
+                    <td>${p.preguntas.p2.si} / ${p.preguntas.p2.no}</td>
+                    <td>${p.preguntas.p3.si} / ${p.preguntas.p3.no}</td>
+                </tr>`).join('') || '<tr><td colspan="6" style="color:var(--text-muted)">Sin encuestas en este rango</td></tr>';
+        } catch (e) {
+            log('Encuestas: ' + e.message);
+        }
+    }
+
+    async function saveRulesToAPI() {
+        // Ajustes compartidos: se guardan en el servidor para todos los usuarios del programa
+        const grouped = {};
+        clientsConfig.forEach(c => { (grouped[c.name] = grouped[c.name] || []).push(c.number); });
+        const body = Object.entries(grouped).map(([nombre, numeros]) => ({ nombre, numeros }));
+        const cfg = getApiConfig();
+        const res = await fetch(cfg.url + '/api/proyectos', {
+            method: 'PUT', headers: { 'X-API-Key': cfg.key, 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+        });
+        if (!res.ok) throw new Error(`No se pudieron guardar los proyectos en la API (error ${res.status}).`);
     }
 
     function exportToPDF() {

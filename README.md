@@ -19,6 +19,7 @@ Una herramienta avanzada y ligera para el análisis y visualización de registro
   - Análisis de productividad del Top 10 de extensiones/agentes.
   - Gráfico de pastel de estados de llamadas.
 - **📄 Reportes PDF**: Vista optimizada para impresión (CSS Print) que genera documentos profesionales en formato horizontal.
+- **🔌 Sincronización con la Planta**: trae las llamadas y encuestas directamente de la planta telefónica por API, para cualquier rango de fechas.
 - **🛠️ Reconciliación de Datos**: Algoritmo que agrupa múltiples eventos de CDR (main_cdr y sub_cdr) bajo un mismo `uniqueid` para evitar duplicidad y mejorar la precisión.
 
 ---
@@ -65,6 +66,25 @@ A diferencia de los visores de CSV convencionales, esta herramienta aplica una l
 - **Unique ID**: Se utiliza como clave primaria para agrupar todas las filas relacionadas a una misma llamada.
 - **Criterio de Respuesta**: Una llamada se considera `ANSWERED` si al menos uno de sus eventos asociados tiene tiempo de conversación superior a 0 segundos.
 - **Abandonadas en IVR**: Identifica automáticamente llamadas que no llegaron a una extensión interna (4 dígitos), clasificándolas como abandonadas para no penalizar el KPI de los agentes.
+
+---
+
+## 🔌 Sincronizar con la Planta (API)
+
+Además de cargar el CSV a mano, el tablero puede traer las llamadas **directamente de la planta telefónica** a través de la *API de Reportes de Llamadas REN* (servidor MonitorRed).
+
+1. Haz clic en **Conexión API** e ingresa:
+   - **URL**: `http://181.49.161.210:3091` (fuera de la oficina) o `http://10.24.0.4:8091` (dentro de la red).
+   - **API Key**: la clave entregada por Gestión de Tecnología (se guarda solo en tu navegador).
+2. Elige el rango en **Desde / Hasta** y pulsa **Sincronizar Planta**.
+3. Al cambiar las fechas se vuelve a consultar la planta automáticamente; los demás filtros (proyecto, estado, sentido) funcionan igual que con el archivo.
+
+Con la API también se muestran las **Encuestas de Satisfacción** (IVR 7123: tecla 1 = Sí, tecla 2 = No) por pregunta y por proyecto, y los **Ajustes de Clientes** se guardan en el servidor para que todos usen los mismos números.
+
+Documentación de la API (Swagger): `http://181.49.161.210:3091/docs`
+
+> [!NOTE]
+> Si publicas el tablero en un sitio **https** (por ejemplo GitHub Pages), el navegador bloqueará la API mientras esta use **http**. Abre el archivo localmente o publica la API con HTTPS.
 
 ---
 
